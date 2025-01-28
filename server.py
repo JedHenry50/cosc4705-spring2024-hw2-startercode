@@ -39,16 +39,48 @@ def main():
     serverSock.bind(("",args.port))
     serverSock.listen()
 
-    clientList = []
+    clientList = [serverSock]
 
     while True:
 
         # HERE'S WHERE YOU NEED TO FILL IN STUFF
+        # Use select to monitor server socket and client sockets
+        readable, _, _ = select.select(client_list, [], [])
 
+        for sock in readable:
+            if sock is serverSock:  # New client connection
+                try:
+                    client_sock, client_addr = serverSock.accept()
+                    client_list.append(client_sock)
+                    log.info(f"New client connected: {client_addr}")
+                except Exception as e:
+                    log.error(f"Error accepting new client: {e}")
+            else:  # Data from an existing client
+                try:
+                    # Read the length prefix (4 bytes)
+                    packed_size = sock.recv(4)
+                    if not packed_size:  # Client disconnected
+                        log.info(f"Client {sock.getpeername()} disconnected.")
+                        client_list.remove(sock)
+                        sock.close()
+                        continue
+
+                    # Unpack the size and read the message
+                    message_length = struct.unpack("!L", packed_size)[0]
+                    message_data = sock.recv(message_length)
+                    if not message_data:
+                        log.error(f"Failed to receive message data from {sock.getpeername()}.")
+                        continue
+
+                    # Log the received message
+                    log.info(f"Received message: {message_data.decode('utf-8')}")
+
+                except Exception as e:
+                    log.error(f"Error handling client: {e}")
+                    client_list.remove(sock)
+                    sock.close()
         # DELETE THE NEXT TWO LINES. It's here now to prevent busy-waiting.
-        time.sleep(1)
-        log.info("not much happening here.  someone should rewrite this part of the code.")
-
+      
                             
     
 
